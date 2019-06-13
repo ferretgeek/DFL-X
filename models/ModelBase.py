@@ -1,4 +1,4 @@
-import os
+﻿import os
 import json
 import time
 import inspect
@@ -34,16 +34,16 @@ class ModelBase(object):
         if device_args['force_gpu_idx'] == -1 and not device_args['cpu_only']:
             idxs_names_list = nnlib.device.getValidDevicesIdxsWithNamesList()
             if len(idxs_names_list) > 1:
-                io.log_info ("You have multi GPUs in a system: ")
+                io.log_info ("系统中有多个GPU：")
                 for idx, name in idxs_names_list:
                     io.log_info ("[%d] : %s" % (idx, name) )
 
-                device_args['force_gpu_idx'] = io.input_int("Which GPU idx to choose? ( skip: best GPU ) : ", -1, [ x[0] for x in idxs_names_list] )
+                device_args['force_gpu_idx'] = io.input_int("选择哪种GPU idx？（跳过：最好的GPU）：", -1, [ x[0] for x in idxs_names_list] )
         self.device_args = device_args
 
         self.device_config = nnlib.DeviceConfig(allow_growth=False, **self.device_args)
 
-        io.log_info ("Loading model...")
+        io.log_info ("载入模型...")
 
         self.model_path = model_path
         self.model_data_path = Path( self.get_strpath_storage_for_file('data.dat') )
@@ -77,27 +77,27 @@ class ModelBase(object):
                 self.loss_history = model_data.get('loss_history', [])
                 self.sample_for_preview = model_data.get('sample_for_preview', None)
 
-        ask_override = self.is_training_mode and self.iter != 0 and io.input_in_time ("Press enter in 2 seconds to override model settings.", 5 if io.is_colab() else 2 )
+        ask_override = self.is_training_mode and self.iter != 0 and io.input_in_time ("如果需要更改模型设置2秒内按回车更改。", 5 if io.is_colab() else 2 )
 
         yn_str = {True:'y',False:'n'}
 
         if self.iter == 0:
-            io.log_info ("\nModel first run. Enter model options as default for each run.")
+            io.log_info ("模型首次运行训练。输入模型选项作为每次运行的默认选项。")
 
         if ask_write_preview_history and (self.iter == 0 or ask_override):
             default_write_preview_history = False if self.iter == 0 else self.options.get('write_preview_history',False)
-            self.options['write_preview_history'] = io.input_bool("Write preview history? (y/n ?:help skip:%s) : " % (yn_str[default_write_preview_history]) , default_write_preview_history, help_message="Preview history will be writed to <ModelName>_history folder.")
+            self.options['write_preview_history'] = io.input_bool("保存预览历史记录？ (y/n 帮助:? 跳过:%s) ： " % (yn_str[default_write_preview_history]) , default_write_preview_history, help_message="记录将写入预览历史记录 <ModelName>_history 文件夹内。")
         else:
             self.options['write_preview_history'] = self.options.get('write_preview_history', False)
 
         if (self.iter == 0 or ask_override) and self.options['write_preview_history'] and io.is_support_windows():
-            choose_preview_history = io.input_bool("Choose image for the preview history? (y/n skip:%s) : " % (yn_str[False]) , False)
+            choose_preview_history = io.input_bool("为预览历史选择图像？ (y/n 跳过:%s) ：" % (yn_str[False]) , False)
         else:
             choose_preview_history = False
         
         if ask_target_iter:
             if (self.iter == 0 or ask_override):
-                self.options['target_iter'] = max(0, io.input_int("Target iteration (skip:unlimited/default) : ", 0))
+                self.options['target_iter'] = max(0, io.input_int("目标迭代(跳过:默认无限（无限数值为0）) ： ", 0))
             else:
                 self.options['target_iter'] = max(model_data.get('target_iter',0), self.options.get('target_epoch',0))
                 if 'target_epoch' in self.options:
@@ -105,26 +105,26 @@ class ModelBase(object):
 
         if ask_batch_size and (self.iter == 0 or ask_override):
             default_batch_size = 0 if self.iter == 0 else self.options.get('batch_size',0)
-            self.options['batch_size'] = max(0, io.input_int("Batch_size (?:help skip:%d) : " % (default_batch_size), default_batch_size, help_message="Larger batch size is better for NN's generalization, but it can cause Out of Memory error. Tune this value for your videocard manually."))
+            self.options['batch_size'] = max(0, io.input_int("Batch_size (帮助:? 跳过:%d)： " % (default_batch_size), default_batch_size, help_message="大的批量大小总是更好的神经网络的泛化,但它可能导致显存溢出错误。根据你的显卡手动调整合适值。"))
         else:
             self.options['batch_size'] = self.options.get('batch_size', 0)
 
         if ask_sort_by_yaw:            
             if (self.iter == 0 or ask_override):
                 default_sort_by_yaw = self.options.get('sort_by_yaw', False)
-                self.options['sort_by_yaw'] = io.input_bool("Feed faces to network sorted by yaw? (y/n ?:help skip:%s) : " % (yn_str[default_sort_by_yaw]), default_sort_by_yaw, help_message="NN will not learn src face directions that don't match dst face directions. Do not use if the dst face has hair that covers the jaw." )
+                self.options['sort_by_yaw'] = io.input_bool("面向网络按偏航排序? (y/n 帮助:? 跳过:%s))：" % (yn_str[default_sort_by_yaw]), default_sort_by_yaw, help_message="神经网络不会学习与dst面部方向不匹配的src面部方向。 如果dst脸上有覆盖下巴的头发，请不要使用。 " )
             else:
                 self.options['sort_by_yaw'] = self.options.get('sort_by_yaw', False)
 
         if ask_random_flip:
             if (self.iter == 0):
-                self.options['random_flip'] = io.input_bool("Flip faces randomly? (y/n ?:help skip:y) : ", True, help_message="Predicted face will look more naturally without this option, but src faceset should cover all face directions as dst faceset.")
+                self.options['random_flip'] = io.input_bool("随机翻转脸？(y/n 帮助:? 跳过:y) ： ", True, help_message="不选择这个选项，预测的脸看起来会更自然,但是src脸部可能没有覆盖dst脸部所有面对的方向。")
             else:
                 self.options['random_flip'] = self.options.get('random_flip', True)
 
         if ask_src_scale_mod:
             if (self.iter == 0):
-                self.options['src_scale_mod'] = np.clip( io.input_int("Src face scale modifier % ( -30...30, ?:help skip:0) : ", 0, help_message="If src face shape is wider than dst, try to decrease this value to get a better result."), -30, 30)
+                self.options['src_scale_mod'] = np.clip( io.input_int("面部比例修改器 % ( -30...30, 帮助:? 跳过:0)： ", 0, help_message="如果src面部形状比dst宽，尝试减少这个值得到更好的结果。"), -30, 30)
             else:
                 self.options['src_scale_mod'] = self.options.get('src_scale_mod', 0)
 
@@ -172,11 +172,11 @@ class ModelBase(object):
                             Path(filename).unlink()
 
             if self.generator_list is None:
-                raise ValueError( 'You didnt set_training_data_generators()')
+                raise ValueError( '你没有设置training_data generators')
             else:
                 for i, generator in enumerate(self.generator_list):
                     if not isinstance(generator, SampleGeneratorBase):
-                        raise ValueError('training data generator is not subclass of SampleGeneratorBase')
+                        raise ValueError('训练数据生成器不是样品生成器基础的子类')
 
             if self.sample_for_preview is None or choose_preview_history:                
                 if choose_preview_history and io.is_support_windows():
@@ -209,19 +209,19 @@ class ModelBase(object):
 
         model_summary_text = []
 
-        model_summary_text += ["===== Model summary ====="]
-        model_summary_text += ["== Model name: " + self.get_model_name()]
+        model_summary_text += ["===== 模型记录 ====="]
+        model_summary_text += ["== 模型名称: " + self.get_model_name()]
         model_summary_text += ["=="]
-        model_summary_text += ["== Current iteration: " + str(self.iter)]
+        model_summary_text += ["== 当前迭代: " + str(self.iter)]
         model_summary_text += ["=="]
-        model_summary_text += ["== Model options:"]
+        model_summary_text += ["== 模型的选项:"]
         for key in self.options.keys():
             model_summary_text += ["== |== %s : %s" % (key, self.options[key])]
 
         if self.device_config.multi_gpu:
             model_summary_text += ["== |== multi_gpu : True "]
 
-        model_summary_text += ["== Running on:"]
+        model_summary_text += ["== 运行模式:"]
         if self.device_config.cpu_only:
             model_summary_text += ["== |== [CPU]"]
         else:
@@ -230,9 +230,9 @@ class ModelBase(object):
 
         if not self.device_config.cpu_only and self.device_config.gpu_vram_gb[0] == 2:
             model_summary_text += ["=="]
-            model_summary_text += ["== WARNING: You are using 2GB GPU. Result quality may be significantly decreased."]
-            model_summary_text += ["== If training does not start, close all programs and try again."]
-            model_summary_text += ["== Also you can disable Windows Aero Desktop to get extra free VRAM."]
+            model_summary_text += ["== 警告:您使用的是2GB的GPU。结果质量可能会大幅下降。"]
+            model_summary_text += ["== 如果训练没有开始,请关闭所有程序并重试。"]
+            model_summary_text += ["== 您还可以禁用Windows Aero以获得更多显存。"]
             model_summary_text += ["=="]
 
         model_summary_text += ["========================="]
@@ -346,7 +346,7 @@ class ModelBase(object):
                                 opt.set_weights(weights)
                                 print("set ok")
                 except Exception as e:
-                    print ("Unable to load ", opt_filename)
+                    print ("无法加载 ", opt_filename)
 
 
     def save_weights_safe(self, model_filename_list, optimizer_filename_list=[]):
@@ -373,7 +373,7 @@ class ModelBase(object):
 
                 rename_list += [('', 'opt.h5')]
             except Exception as e:
-                print ("Unable to save ", opt_filename)
+                print ("无法保存：", opt_filename)
 
         for _, filename in rename_list:
             filename = self.get_strpath_storage_for_file(filename)
@@ -406,7 +406,7 @@ class ModelBase(object):
 
         self.loss_history.append ( [float(loss[1]) for loss in losses] )
 
-        if self.iter % 10 == 0:
+        if self.iter % 100 == 0:
             plist = []
 
             if io.is_colab():
