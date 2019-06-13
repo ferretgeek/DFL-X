@@ -1,4 +1,4 @@
-﻿import traceback
+import traceback
 import os
 import sys
 import time
@@ -20,7 +20,6 @@ from facelib import FANSegmentator
 from nnlib import nnlib
 from joblib import Subprocessor
 from interact import interact as io
-
 class ExtractSubprocessor(Subprocessor):
     class Data(object):
         def __init__(self, filename=None, rects=None, landmarks = None, landmarks_accurate=True, pitch_yaw_roll=None, final_output_files = None):
@@ -51,9 +50,9 @@ class ExtractSubprocessor(Subprocessor):
             device_config = nnlib.DeviceConfig ( cpu_only=self.cpu_only, force_gpu_idx=self.device_idx, allow_growth=True)
             self.device_vram = device_config.gpu_vram_gb[0]
 
-            intro_str = 'Running on %s.' % (client_dict['device_name'])
+            intro_str = '运行模式： %s.' % (client_dict['device_name'])
             if not self.cpu_only and self.device_vram <= 2:
-                intro_str += " Recommended to close all programs using this device."
+                intro_str += " 建议使用此设备关闭所有程序。"
 
             self.log_info (intro_str)
 
@@ -85,7 +84,7 @@ class ExtractSubprocessor(Subprocessor):
                     
             elif self.type == 'fanseg':
                 nnlib.import_all (device_config)
-                self.e = facelib.FANSegmentator(256, FaceType.toString(FaceType.FULL) )
+                self.e = facelib.FANSegmentator(mdo1, FaceType.toString(FaceType.FULL) )
                 self.e.__enter__()
                     
             elif self.type == 'final':
@@ -107,7 +106,7 @@ class ExtractSubprocessor(Subprocessor):
                 image = cv2_imread( filename_path_str )
 
                 if image is None:
-                    self.log_err ( 'Failed to extract %s, reason: cv2_imread() fail.' % ( str(filename_path) ) )
+                    self.log_err ( '无法提取 %s, 原因: cv2_imread() fail.' % ( str(filename_path) ) )
                     return data
 
                 image_shape = image.shape
@@ -139,7 +138,7 @@ class ExtractSubprocessor(Subprocessor):
 
             if 'rects' in self.type:
                 if min(w,h) < 128:
-                    self.log_err ( 'Image is too small %s : [%d, %d]' % ( str(filename_path), w, h ) )
+                    self.log_err ( '图片太小了 %s : [%d, %d]' % ( str(filename_path), w, h ) )
                     data.rects = []
                 else:
                     for rot in ([0, 90, 270, 180]):
@@ -201,7 +200,7 @@ class ExtractSubprocessor(Subprocessor):
                 landmarks = data.landmarks
 
                 if self.debug_dir is not None:
-                    debug_output_file = str( Path(self.debug_dir) / (filename_path.stem+'.jpg') )
+                    debug_output_file = str( Path(self.debug_dir) / (filename_path.stem+'.png') )
                     debug_image = image.copy()
 
                 if src_dflimg is not None and len(rects) != 1:
@@ -242,16 +241,16 @@ class ExtractSubprocessor(Subprocessor):
                         if self.debug_dir is not None:
                             LandmarksProcessor.draw_rect_landmarks (debug_image, rect, image_landmarks, self.image_size, self.face_type, transparent_mask=True)
 
-                        if src_dflimg is not None and filename_path.suffix == '.jpg':
+                        if src_dflimg is not None and filename_path.suffix == '.png':
                             #if extracting from dflimg and jpg copy it in order not to lose quality
                             output_file = str(self.final_output_path / filename_path.name)
                             if str(filename_path) != str(output_file):
                                 shutil.copy ( str(filename_path), str(output_file) )
                         else:
-                            output_file = '{}_{}{}'.format(str(self.final_output_path / filename_path.stem), str(face_idx), '.jpg')
+                            output_file = '{}_{}{}'.format(str(self.final_output_path / filename_path.stem), str(face_idx), '.png')
                             cv2_imwrite(output_file, face_image, [int(cv2.IMWRITE_JPEG_QUALITY), 85] )
 
-                        DFLJPG.embed_data(output_file, face_type=FaceType.toString(self.face_type),
+                        DFLPNG.embed_data(output_file, face_type=FaceType.toString(self.face_type),
                                                        landmarks=face_image_landmarks.tolist(),
                                                        source_filename=filename_path.name,
                                                        source_rect=rect,
@@ -653,7 +652,7 @@ class DeletedFilesSearcherSubprocessor(Subprocessor):
 
     #override
     def on_clients_initialized(self):
-        io.progress_bar ("Searching deleted files", len (self.input_paths))
+        io.progress_bar ("搜索已删除的文件", len (self.input_paths))
 
     #override
     def on_clients_finalized(self):
@@ -687,7 +686,7 @@ def extract_fanseg(input_dir, device_args={} ):
     
     input_path = Path(input_dir)
     if not input_path.exists():
-        raise ValueError('Input directory not found. Please ensure it exists.')
+        raise ValueError('找不到输入目录。 请确保它存在。')
     
     paths_to_extract = []
     for filename in Path_utils.get_image_paths(input_path) :
@@ -704,32 +703,32 @@ def extract_fanseg(input_dir, device_args={} ):
     
     paths_to_extract_len = len(paths_to_extract)
     if paths_to_extract_len > 0:
-        io.log_info ("Performing extract fanseg for %d files..." % (paths_to_extract_len) )
+        io.log_info ("为 %d 个文件执行提取..." % (paths_to_extract_len) )
         data = ExtractSubprocessor ([ ExtractSubprocessor.Data(filename) for filename in paths_to_extract ], 'fanseg', multi_gpu=multi_gpu, cpu_only=cpu_only).run()
 
 def extract_umd_csv(input_file_csv, 
-                    image_size=256,
                     face_type='full_face',
                     device_args={} ):
-                    
+    mdo1 = io.input_int ("提取头像的大小128、256、512( 帮助:? 跳过:256 ) : ", 256, help_message="提取头像的大小。")
+    image_size= mdo1
     #extract faces from umdfaces.io dataset csv file with pitch,yaw,roll info.
-    multi_gpu = device_args.get('multi_gpu', False)
+    multi_gpu = device_args.get('multi_gpu', True)
     cpu_only = device_args.get('cpu_only', False)
     face_type = FaceType.fromString(face_type)
     
     input_file_csv_path = Path(input_file_csv)
     if not input_file_csv_path.exists():
-        raise ValueError('input_file_csv not found. Please ensure it exists.')
+        raise ValueError('找不到input_file_csv。 请确保它存在。')
     
     input_file_csv_root_path = input_file_csv_path.parent
     output_path = input_file_csv_path.parent / ('aligned_' + input_file_csv_path.name)
     
-    io.log_info("Output dir is %s." % (str(output_path)) )
+    io.log_info("输出目录是 %s." % (str(output_path)) )
     
     if output_path.exists():
         output_images_paths = Path_utils.get_image_paths(output_path)
         if len(output_images_paths) > 0:
-            io.input_bool("WARNING !!! \n %s contains files! \n They will be deleted. \n Press enter to continue." % (str(output_path)), False )
+            io.input_bool("警告 !!! \n %s 内有文件! \n 它们将被删除。 \n 按 Enter 键继续。" % (str(output_path)), False )
             for filename in output_images_paths:
                 Path(filename).unlink()
     else:
@@ -739,7 +738,7 @@ def extract_umd_csv(input_file_csv,
         with open( str(input_file_csv_path), 'r') as f:
             csv_file = f.read()
     except Exception as e:
-        io.log_err("Unable to open or read file " + str(input_file_csv_path) + ": " + str(e) )
+        io.log_err("无法打开或读取文件" + str(input_file_csv_path) + ": " + str(e) )
         return
         
     strings = csv_file.split('\n')        
@@ -749,7 +748,7 @@ def extract_umd_csv(input_file_csv,
     for i in range(1, len(strings)):
         values = strings[i].split(',')
         if keys_len != len(values):
-            io.log_err("Wrong string in csv file, skipping.")
+            io.log_err("csv文件中的字符串错误，正在跳过。")
             continue
             
         csv_data += [ { keys[n] : values[n] for n in range(keys_len) } ]
@@ -771,17 +770,17 @@ def extract_umd_csv(input_file_csv,
     images_found = len(data)
     faces_detected = 0
     if len(data) > 0:
-        io.log_info ("Performing 2nd pass from csv file...")
+        io.log_info ("从csv文件执行第二遍......")
         data = ExtractSubprocessor (data, 'landmarks', multi_gpu=multi_gpu, cpu_only=cpu_only).run()
         
-        io.log_info ('Performing 3rd pass...')
+        io.log_info ('进行第3步...')
         data = ExtractSubprocessor (data, 'final', image_size, face_type, None, multi_gpu=multi_gpu, cpu_only=cpu_only, manual=False, final_output_path=output_path).run()
         faces_detected += sum([d.faces_detected for d in data])
         
         
     io.log_info ('-------------------------')
-    io.log_info ('Images found:        %d' % (images_found) )
-    io.log_info ('Faces detected:      %d' % (faces_detected) )
+    io.log_info ('发现图片:        %d' % (images_found) )
+    io.log_info ('检测到脸型:      %d' % (faces_detected) )
     io.log_info ('-------------------------')
     
 def main(input_dir,
@@ -791,7 +790,6 @@ def main(input_dir,
          manual_fix=False,
          manual_output_debug_fix=False,
          manual_window_size=1368,
-         image_size=256,
          face_type='full_face',
          device_args={}):
 
@@ -799,17 +797,18 @@ def main(input_dir,
     output_path = Path(output_dir)
     face_type = FaceType.fromString(face_type)
 
-    multi_gpu = device_args.get('multi_gpu', False)
+    multi_gpu = device_args.get('multi_gpu', True)
     cpu_only = device_args.get('cpu_only', False)
-
+    mdo1 = io.input_int ("提取头像的大小128、256、512( 帮助:? 跳过:256 ) : ", 256, help_message="提取头像的大小。")
+    image_size= mdo1
     if not input_path.exists():
-        raise ValueError('Input directory not found. Please ensure it exists.')
+        raise ValueError('找不到输入目录。 请确保它存在。')
 
     if output_path.exists():
         if not manual_output_debug_fix and input_path != output_path:
             output_images_paths = Path_utils.get_image_paths(output_path)
             if len(output_images_paths) > 0:
-                io.input_bool("WARNING !!! \n %s contains files! \n They will be deleted. \n Press enter to continue." % (str(output_path)), False )
+                io.input_bool("警告 !!! \n %s 内有文件! \n 它们将被删除。 \n 按 Enter 键继续。" % (str(output_path)), False )
                 for filename in output_images_paths:
                     Path(filename).unlink()
     else:
@@ -817,9 +816,9 @@ def main(input_dir,
 
     if manual_output_debug_fix:
         if debug_dir is None:
-            raise ValueError('debug-dir must be specified')
+            raise ValueError('必须指定debug目录')
         detector = 'manual'
-        io.log_info('Performing re-extract frames which were deleted from _debug directory.')
+        io.log_info('执行重新提取从_debug目录中删除的帧')
 
     input_path_image_paths = Path_utils.get_image_unique_filestem_paths(input_path, verbose_print_func=io.log_info)
     if debug_dir is not None:
@@ -827,11 +826,11 @@ def main(input_dir,
 
         if manual_output_debug_fix:
             if not debug_output_path.exists():
-                raise ValueError("%s not found " % ( str(debug_output_path) ))
+                raise ValueError("%s 未找到 " % ( str(debug_output_path) ))
 
             input_path_image_paths = DeletedFilesSearcherSubprocessor (input_path_image_paths, Path_utils.get_image_paths(debug_output_path) ).run()
             input_path_image_paths = sorted (input_path_image_paths)
-            io.log_info('Found %d images.' % (len(input_path_image_paths)))
+            io.log_info('找到 %d 张图片。' % (len(input_path_image_paths)))
         else:
             if debug_output_path.exists():
                 for filename in Path_utils.get_image_paths(debug_output_path):
@@ -843,31 +842,31 @@ def main(input_dir,
     faces_detected = 0
     if images_found != 0:
         if detector == 'manual':
-            io.log_info ('Performing manual extract...')
+            io.log_info ('执行手动提取...')
             data = ExtractSubprocessor ([ ExtractSubprocessor.Data(filename) for filename in input_path_image_paths ], 'landmarks', image_size, face_type, debug_dir, cpu_only=cpu_only, manual=True, manual_window_size=manual_window_size).run()
         else:
-            io.log_info ('Performing 1st pass...')
+            io.log_info ('进行第1步...')
             data = ExtractSubprocessor ([ ExtractSubprocessor.Data(filename) for filename in input_path_image_paths ], 'rects-'+detector, image_size, face_type, debug_dir, multi_gpu=multi_gpu, cpu_only=cpu_only, manual=False).run()
 
-            io.log_info ('Performing 2nd pass...')
+            io.log_info ('进行第2步...')
             data = ExtractSubprocessor (data, 'landmarks', image_size, face_type, debug_dir, multi_gpu=multi_gpu, cpu_only=cpu_only, manual=False).run()
 
-        io.log_info ('Performing 3rd pass...')
+        io.log_info ('进行第3步...')
         data = ExtractSubprocessor (data, 'final', image_size, face_type, debug_dir, multi_gpu=multi_gpu, cpu_only=cpu_only, manual=False, final_output_path=output_path).run()
         faces_detected += sum([d.faces_detected for d in data])
 
         if manual_fix:
             if all ( np.array ( [ d.faces_detected > 0 for d in data] ) == True ):
-                io.log_info ('All faces are detected, manual fix not needed.')
+                io.log_info ('检测到所有脸型，不需要手动提取。')
             else:
                 fix_data = [ ExtractSubprocessor.Data(d.filename) for d in data if d.faces_detected == 0 ]
-                io.log_info ('Performing manual fix for %d images...' % (len(fix_data)) )
+                io.log_info ('对 %d 张图片进行手动提取...' % (len(fix_data)) )
                 fix_data = ExtractSubprocessor (fix_data, 'landmarks', image_size, face_type, debug_dir, manual=True, manual_window_size=manual_window_size).run()
                 fix_data = ExtractSubprocessor (fix_data, 'final', image_size, face_type, debug_dir, multi_gpu=multi_gpu, cpu_only=cpu_only, manual=False, final_output_path=output_path).run()
                 faces_detected += sum([d.faces_detected for d in fix_data])
 
 
     io.log_info ('-------------------------')
-    io.log_info ('Images found:        %d' % (images_found) )
-    io.log_info ('Faces detected:      %d' % (faces_detected) )
+    io.log_info ('发现图片:        %d' % (images_found) )
+    io.log_info ('检测到脸型:      %d' % (faces_detected) )
     io.log_info ('-------------------------')
